@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WhatsApp V2 - Gacor</title>
+<style>
+body{font-family:sans-serif;background:#f2f2f2}
+.box{max-width:420px;margin:15px auto;background:#fff;padding:15px;border-radius:8px}
+#chat{height:220px;border:1px solid #ccc;overflow:auto;padding:5px}
+input,button{width:100%;padding:8px;margin:5px 0}
+.msg{margin:6px 0;padding:6px;border-radius:5px}
+.owner{background:yellow}
+.time{font-size:10px;color:#666}
+#adminPanel{display:none;background:#ffe066;padding:10px;margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="box" id="loginBox">
+<h3>Login</h3>
+<input id="user" placeholder="Username">
+<input id="adminPass" placeholder="Password Admin (admin saja)">
+<input id="kupon" placeholder="Kupon (TESTER)">
+<button onclick="login()">Masuk</button>
+</div>
+
+<div class="box" id="chatBox" style="display:none">
+<h3>Chat Online</h3>
+
+<h4>User Online</h4>
+<ul id="userOnline"></ul>
+
+<div id="chat"></div>
+<input id="msg" placeholder="Pesan">
+<button onclick="kirim()">Kirim</button>
+
+<div id="adminPanel">
+<b>ADMIN PANEL</b>
+<button onclick="hapusSemua()">🗑️ Hapus Semua Chat</button>
+<input id="kickUser" placeholder="Username di‑kick">
+<button onclick="kick()">🚫 Kick User</button>
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+// ===== FIREBASE =====
+firebase.initializeApp({
+  apiKey:"API_KEY",
+  authDomain:"PROJECT.firebaseapp.com",
+  databaseURL:"https://PROJECT.firebaseio.com"
+});
+var db=firebase.database();
+
+// ===== LOGIN + KUPON + ADMIN PASSWORD =====
+function login(){
+ if(!user.value) return alert("Isi username");
+
+ if(user.value=="admin" && adminPass.value!="ADMIN123")
+   return alert("Password admin salah");
+
+ let key="kupon_"+user.value;
+ if(localStorage.getItem(key)=="pakai")
+   return alert("Kupon user ini sudah dipakai");
+ if(kupon.value!="TESTER") return alert("Kupon salah");
+
+ localStorage.setItem(key,"pakai");
+ loginBox.style.display="none";
+ chatBox.style.display="block";
+
+ // online
+ db.ref("online/"+user.value).set(true);
+ window.onbeforeunload=()=>db.ref("online/"+user.value).remove();
+
+ if(user.value=="admin") adminPanel.style.display="block";
+
+ // cek kick
+ db.ref("kick/"+user.value).on("value",s=>{
+  if(s.exists()){ alert("Kamu di‑kick admin"); location.reload(); }
+ });
+}
+
+// ===== KIRIM CHAT =====
+function kirim(){
+ if(!msg.value) return;
+ db.ref("chat").push({
+  u:user.value,
+  m:msg.value,
+  t:new Date().toLocaleTimeString()
+ });
+ msg.value="";
+}
+
+// ===== REALTIME CHAT =====
+db.ref("chat").on("child_added",s=>{
+ let d=s.val(), id=s.key;
+ let cls=d.u=="admin"?"owner":"";
+ let del=(user.value=="admin")?`<button onclick="hapus('${id}')">🗑️</button>`:"";
+ chat.innerHTML+=`
+ <div class="msg ${cls}" id="${id}">
+  <b>${d.u}</b> <span class="time">${d.t}</span> ${del}<br>${d.m}
+ </div>`;
+ chat.scrollTop=chat.scrollHeight;
+});
+
+// ===== LIST USER ONLINE =====
+db.ref("online").on("value",s=>{
+ userOnline.innerHTML="";
+ s.forEach(u=>userOnline.innerHTML+=`<li>${u.key}</li>`);
+});
+
+// ===== ADMIN =====
+function hapus(id){
+ db.ref("chat/"+id).remove();
+ document.getElementById(id)?.remove();
+}
+function hapusSemua(){
+ if(confirm("Hapus semua chat?")){
+  db.ref("chat").remove(); chat.innerHTML="";
+ }
+}
+function kick(){
+ if(!kickUser.value) return;
+ db.ref("kick/"+kickUser.value).set(true);
+ alert("User di‑kick");
+}
+</script>
+</body>
+</html>
